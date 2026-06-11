@@ -1,0 +1,959 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Folder Regex File Finder</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #17202a;
+      --muted: #667085;
+      --line: #d7dce2;
+      --accent: #1b6fd8;
+      --accent-dark: #1559ad;
+      --danger: #b42318;
+      --ok: #177245;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+
+    main {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 28px auto;
+    }
+
+    h1 {
+      margin: 0 0 18px;
+      font-size: 26px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .toolbar,
+    .results,
+    .status {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 10px;
+      align-items: end;
+      padding: 14px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    .checks {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      min-height: 38px;
+      color: var(--ink);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .checks label {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      color: var(--ink);
+    }
+
+    button {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 12px;
+      font: inherit;
+      font-weight: 600;
+      color: var(--ink);
+      background: #fff;
+      cursor: pointer;
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      color: #fff;
+      background: var(--accent);
+    }
+
+    button.primary:hover {
+      background: var(--accent-dark);
+    }
+
+    button.danger {
+      border-color: var(--danger);
+      color: #fff;
+      background: var(--danger);
+    }
+
+    button.danger:hover {
+      background: #8f1b13;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .folder-list-panel {
+      margin-top: 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+      font-size: 13px;
+    }
+
+    .folder-list-panel summary {
+      padding: 10px 14px;
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 600;
+      user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .folder-list-panel summary::before {
+      content: "▶";
+      font-size: 10px;
+      transition: transform 0.15s;
+    }
+
+    .folder-list-panel[open] summary::before {
+      transform: rotate(90deg);
+    }
+
+    .folder-list-body {
+      padding: 0 14px 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .folder-list-body textarea {
+      width: 100%;
+      height: 120px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font: 12px/1.5 "Consolas", "Menlo", monospace;
+      color: var(--ink);
+      background: #fafbfc;
+      resize: vertical;
+    }
+
+    .folder-list-body textarea:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: -1px;
+    }
+
+    .folder-list-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status {
+      margin-top: 12px;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .status.ok {
+      color: var(--ok);
+    }
+
+    .status.warn {
+      color: #92400e;
+    }
+
+    .inaccessible {
+      margin-top: 6px;
+      background: #fff8f8;
+      border: 1px solid #fecdca;
+      border-radius: 8px;
+      font-size: 13px;
+      overflow: hidden;
+    }
+
+    .inaccessible summary {
+      padding: 8px 12px;
+      cursor: pointer;
+      color: var(--danger);
+      font-weight: 600;
+      user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .inaccessible summary::before {
+      content: "▶";
+      font-size: 10px;
+      transition: transform 0.15s;
+    }
+
+    .inaccessible[open] summary::before {
+      transform: rotate(90deg);
+    }
+
+    .inaccessible ul {
+      margin: 0;
+      padding: 0 12px 10px 28px;
+      list-style: disc;
+      color: var(--danger);
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .inaccessible li {
+      padding: 2px 0;
+      overflow-wrap: anywhere;
+    }
+
+    .results {
+      margin-top: 12px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+      font-size: 14px;
+    }
+
+    th {
+      color: var(--muted);
+      background: #fafbfc;
+      font-weight: 650;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .name {
+      width: 28%;
+      overflow-wrap: anywhere;
+    }
+
+    .path {
+      width: 34%;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .size {
+      width: 90px;
+      white-space: nowrap;
+    }
+
+    .action {
+      width: 220px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .content {
+      width: 110px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    button.bulk-action {
+      min-height: unset;
+      min-width: 72px;
+      padding: 2px 7px;
+      font-size: 11px;
+      border-radius: 4px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    td.action button {
+      min-width: 118px;
+    }
+
+    td.content button {
+      min-width: 74px;
+    }
+
+    .empty {
+      padding: 24px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        width: calc(100vw - 20px);
+        margin: 16px auto;
+      }
+
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+
+      .checks {
+        flex-wrap: wrap;
+      }
+
+      table,
+      thead,
+      tbody,
+      tr,
+      th,
+      td {
+        display: block;
+      }
+
+      thead {
+        display: none;
+      }
+
+      tr {
+        border-bottom: 1px solid var(--line);
+        padding: 10px;
+      }
+
+      td {
+        width: 100% !important;
+        border: 0;
+        padding: 4px 0;
+      }
+
+      .action {
+        text-align: left;
+        padding-top: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Folder Regex File Finder</h1>
+
+    <section class="toolbar" aria-label="Search controls">
+      <label>
+        Regex filename search
+        <input id="pattern" type="text" value="FO.*\\.pdf$" spellcheck="false" autocomplete="off">
+      </label>
+
+      <div class="checks">
+        <label><input id="recursive" type="checkbox" checked> Recursive</label>
+        <label><input id="caseInsensitive" type="checkbox" checked> Ignore case</label>
+        <label><input id="extractText" type="checkbox"> Extract PDF text</label>
+      </div>
+
+      <button id="pickFolder" type="button">Choose Folder</button>
+      <button id="search" class="primary" type="button" disabled>Search</button>
+    </section>
+
+    <details class="folder-list-panel" id="folderListPanel">
+      <summary>Limit search to specific folders <span id="folderListCount"></span></summary>
+      <div class="folder-list-body">
+        <textarea id="dirList" spellcheck="false" placeholder="Paste one folder path per line. Accepts:&#10;  • file://server/path/to/folder&#10;  • relative/path/from/root&#10;Leave empty to search the whole selected folder."></textarea>
+        <div class="folder-list-footer">
+          <span id="folderListHint"></span>
+          <button id="clearDirList" type="button">Clear</button>
+        </div>
+      </div>
+    </details>
+
+    <div id="status" class="status">Choose a folder to begin.</div>
+    <details id="inaccessibleFoldersSection" class="inaccessible" hidden>
+      <summary id="inaccessibleFoldersSummary"></summary>
+      <ul id="inaccessibleFoldersList"></ul>
+    </details>
+    <details id="inaccessibleFilesSection" class="inaccessible" hidden>
+      <summary id="inaccessibleFilesSummary"></summary>
+      <ul id="inaccessibleFilesList"></ul>
+    </details>
+
+    <section class="results" aria-label="Search results">
+      <table>
+        <thead>
+          <tr>
+            <th class="name">File</th>
+            <th class="path">Folder</th>
+            <th class="size">Size</th>
+            <th class="content">Content</th>
+            <th class="action">Action <button id="copyResults" class="bulk-action" type="button" hidden>Copy</button><button id="downloadAll" class="bulk-action" type="button" hidden>↓ All</button></th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody">
+          <tr><td class="empty" colspan="5">No results yet.</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    const pickFolderButton = document.querySelector("#pickFolder");
+    const searchButton = document.querySelector("#search");
+    const patternInput = document.querySelector("#pattern");
+    const recursiveInput = document.querySelector("#recursive");
+    const caseInsensitiveInput = document.querySelector("#caseInsensitive");
+    const extractTextInput = document.querySelector("#extractText");
+    const statusBox = document.querySelector("#status");
+    const resultsBody = document.querySelector("#resultsBody");
+    const dirListTextarea = document.querySelector("#dirList");
+    const clearDirListButton = document.querySelector("#clearDirList");
+    const folderListPanel = document.querySelector("#folderListPanel");
+    const folderListCount = document.querySelector("#folderListCount");
+    const folderListHint = document.querySelector("#folderListHint");
+    const copyResultsButton = document.querySelector("#copyResults");
+    const downloadAllButton = document.querySelector("#downloadAll");
+    const inaccessibleFoldersSection = document.querySelector("#inaccessibleFoldersSection");
+    const inaccessibleFoldersSummary = document.querySelector("#inaccessibleFoldersSummary");
+    const inaccessibleFoldersList = document.querySelector("#inaccessibleFoldersList");
+    const inaccessibleFilesSection = document.querySelector("#inaccessibleFilesSection");
+    const inaccessibleFilesSummary = document.querySelector("#inaccessibleFilesSummary");
+    const inaccessibleFilesList = document.querySelector("#inaccessibleFilesList");
+
+    const storageKeys = {
+      pattern: "fsBridge.pattern",
+      dirList: "fsBridge.dirList",
+      dirListOpen: "fsBridge.dirListOpen",
+      extractText: "fsBridge.extractText",
+    };
+
+    let rootHandle = null;
+    let rootName = "";
+    let currentResults = [];
+    let isSearching = false;
+    let abortRequested = false;
+
+    function loadSavedInputs() {
+      const savedPattern = localStorage.getItem(storageKeys.pattern);
+      const savedDirList = localStorage.getItem(storageKeys.dirList);
+      const savedDirListOpen = localStorage.getItem(storageKeys.dirListOpen);
+      const savedExtractText = localStorage.getItem(storageKeys.extractText);
+      if (savedPattern !== null) patternInput.value = savedPattern;
+      if (savedDirList !== null) dirListTextarea.value = savedDirList;
+      if (savedDirListOpen !== null) folderListPanel.open = savedDirListOpen === "true";
+      if (savedExtractText !== null) extractTextInput.checked = savedExtractText === "true";
+      updateFolderListCount();
+    }
+
+    function setSearchMode(searching) {
+      isSearching = searching;
+      searchButton.disabled = !rootHandle && !searching;
+      searchButton.textContent = searching ? "Abort" : "Search";
+      searchButton.classList.toggle("primary", !searching);
+      searchButton.classList.toggle("danger", searching);
+    }
+
+    function saveInputs() {
+      localStorage.setItem(storageKeys.pattern, patternInput.value);
+      localStorage.setItem(storageKeys.dirList, dirListTextarea.value);
+      localStorage.setItem(storageKeys.extractText, String(extractTextInput.checked));
+    }
+
+    function setStatus(message, type = "") {
+      statusBox.textContent = message;
+      statusBox.className = `status ${type}`.trim();
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      const units = ["KB", "MB", "GB", "TB"];
+      let value = bytes / 1024;
+      let unit = units.shift();
+      while (value >= 1024 && units.length) {
+        value /= 1024;
+        unit = units.shift();
+      }
+      return `${value.toFixed(value >= 10 ? 1 : 2)} ${unit}`;
+    }
+
+    function clearResults(message) {
+      resultsBody.innerHTML = "";
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.className = "empty";
+      cell.colSpan = 5;
+      cell.textContent = message;
+      row.append(cell);
+      resultsBody.append(row);
+    }
+
+    function isPdfName(name) {
+      return /\.pdf$/i.test(name);
+    }
+
+    async function extractPdfText(file) {
+      if (!window.pdfjsLib) {
+        throw new Error("PDF text extraction library did not load.");
+      }
+
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      const document = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+      const pages = [];
+
+      try {
+        for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+          const page = await document.getPage(pageNumber);
+          const textContent = await page.getTextContent();
+          pages.push(textContent.items.map(item => item.str).join(" ").trim());
+        }
+      } finally {
+        await document.destroy();
+      }
+
+      return pages.filter(Boolean).join("\n");
+    }
+
+    async function* walkDirectory(directoryHandle, folderPath, recursive) {
+      try {
+        for await (const [name, handle] of directoryHandle.entries()) {
+          if (handle.kind === "file") {
+            yield { name, handle, folderPath };
+          } else if (recursive && handle.kind === "directory") {
+            const childPath = folderPath ? `${folderPath}/${name}` : name;
+            yield* walkDirectory(handle, childPath, recursive);
+          }
+        }
+      } catch (error) {
+        yield { kind: "error", path: folderPath || directoryHandle.name, error };
+      }
+    }
+
+    function addInaccessible(path, type) {
+      const section = type === "folder" ? inaccessibleFoldersSection : inaccessibleFilesSection;
+      const summary = type === "folder" ? inaccessibleFoldersSummary : inaccessibleFilesSummary;
+      const list = type === "folder" ? inaccessibleFoldersList : inaccessibleFilesList;
+      const label = type === "folder" ? "inaccessible folder" : "inaccessible file";
+      section.hidden = false;
+      const li = document.createElement("li");
+      li.textContent = path;
+      list.append(li);
+      const count = list.children.length;
+      summary.textContent = `${count} ${label}${count === 1 ? "" : "s"}`;
+    }
+
+    function resetInaccessible() {
+      for (const [section, summary, list] of [
+        [inaccessibleFoldersSection, inaccessibleFoldersSummary, inaccessibleFoldersList],
+        [inaccessibleFilesSection, inaccessibleFilesSummary, inaccessibleFilesList],
+      ]) {
+        section.hidden = true;
+        list.innerHTML = "";
+        summary.textContent = "";
+      }
+    }
+
+    function parseDirListLines() {
+      return dirListTextarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+    }
+
+    function updateFolderListCount() {
+      const lines = parseDirListLines();
+      folderListCount.textContent = lines.length ? `(${lines.length} folder${lines.length === 1 ? "" : "s"})` : "";
+    }
+
+    // Resolve a pasted line to path segments relative to the root.
+    // Supports full file:// paths and plain relative paths.
+    function resolveSegments(line, rootName) {
+      let path = line
+        .replace(/^file:\/\/[^/]*\//i, '')  // strip file://host/
+        .replace(/\\/g, '/')                 // normalize backslashes
+        .replace(/^[a-zA-Z]:\//, '');        // strip drive letter e.g. C:/
+      const parts = path.split('/').filter(Boolean);
+      const idx = parts.lastIndexOf(rootName);
+      // if root name found in path, take everything after it
+      if (idx >= 0) return parts.slice(idx + 1);
+      // otherwise treat the whole thing as a relative path from root
+      return parts;
+    }
+
+    async function navigateToPath(handle, segments) {
+      for (const segment of segments) {
+        handle = await handle.getDirectoryHandle(segment);
+      }
+      return handle;
+    }
+
+    patternInput.addEventListener("input", () => {
+      localStorage.setItem(storageKeys.pattern, patternInput.value);
+    });
+
+    extractTextInput.addEventListener("change", () => {
+      localStorage.setItem(storageKeys.extractText, String(extractTextInput.checked));
+    });
+
+    dirListTextarea.addEventListener("input", () => {
+      updateFolderListCount();
+      localStorage.setItem(storageKeys.dirList, dirListTextarea.value);
+    });
+
+    folderListPanel.addEventListener("toggle", () => {
+      localStorage.setItem(storageKeys.dirListOpen, String(folderListPanel.open));
+    });
+
+    clearDirListButton.addEventListener("click", () => {
+      dirListTextarea.value = "";
+      updateFolderListCount();
+      localStorage.setItem(storageKeys.dirList, dirListTextarea.value);
+    });
+
+    function addResult(result) {
+      const row = document.createElement("tr");
+      const nameCell = document.createElement("td");
+      const pathCell = document.createElement("td");
+      const sizeCell = document.createElement("td");
+      const contentCell = document.createElement("td");
+      const actionCell = document.createElement("td");
+      const contentButton = document.createElement("button");
+      const downloadButton = document.createElement("button");
+
+      nameCell.className = "name";
+      pathCell.className = "path";
+      sizeCell.className = "size";
+      contentCell.className = "content";
+      actionCell.className = "action";
+
+      nameCell.textContent = result.name;
+      pathCell.textContent = result.folderPath || rootName;
+      sizeCell.textContent = formatBytes(result.file.size);
+      contentButton.textContent = "Copy";
+      contentButton.type = "button";
+      contentButton.disabled = !result.content;
+      contentButton.addEventListener("click", async () => {
+        try {
+          await writeClipboardText(result.content || "");
+          setStatus(`Copied content from ${result.name}.`, "ok");
+        } catch (error) {
+          console.error(`Could not copy content from "${result.name}":`, error);
+          setStatus(`Could not copy content from "${result.name}": ${error.message}`, "error");
+        }
+      });
+      downloadButton.textContent = "Download";
+      downloadButton.type = "button";
+      downloadButton.addEventListener("click", () => downloadResult(result));
+
+      contentCell.append(contentButton);
+      actionCell.append(downloadButton);
+      row.append(nameCell, pathCell, sizeCell, contentCell, actionCell);
+      resultsBody.append(row);
+      currentResults.push(result);
+      copyResultsButton.hidden = false;
+      downloadAllButton.hidden = false;
+    }
+
+    function escapeTsvValue(value) {
+      return String(value).replace(/\t/g, " ").replace(/\r?\n/g, " ");
+    }
+
+    function buildResultsTsv() {
+      const rows = [
+        ["File name", "Folder", "Size", "Content"],
+        ...currentResults.map(result => [
+          result.name,
+          result.folderPath || rootName,
+          formatBytes(result.file.size),
+          result.content || "",
+        ]),
+      ];
+      return rows.map(row => row.map(escapeTsvValue).join("\t")).join("\n");
+    }
+
+    async function writeClipboardText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.append(textarea);
+      textarea.select();
+      const copied = document.execCommand("copy");
+      textarea.remove();
+      if (!copied) {
+        throw new Error("Clipboard copy is not available in this browser.");
+      }
+    }
+
+    async function downloadResult(result) {
+      try {
+        const file = await result.handle.getFile();
+        const url = URL.createObjectURL(file);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = result.name;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        setStatus(`Download started: ${result.name}`, "ok");
+      } catch (error) {
+        console.error(`Could not download "${result.name}":`, error);
+        setStatus(`Could not download "${result.name}": ${error.message}`, "error");
+      }
+    }
+
+    downloadAllButton.addEventListener("click", async () => {
+      downloadAllButton.disabled = true;
+      setStatus(`Downloading ${currentResults.length} file${currentResults.length === 1 ? "" : "s"}…`);
+      for (const result of currentResults) {
+        try {
+          const file = await result.handle.getFile();
+          const url = URL.createObjectURL(file);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = result.name;
+          document.body.append(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          await new Promise(r => setTimeout(r, 150));
+        } catch (error) {
+          console.error(`Could not download "${result.name}":`, error);
+        }
+      }
+      downloadAllButton.disabled = false;
+      setStatus(`Started download of ${currentResults.length} file${currentResults.length === 1 ? "" : "s"}.`, "ok");
+    });
+
+    copyResultsButton.addEventListener("click", async () => {
+      copyResultsButton.disabled = true;
+      try {
+        await writeClipboardText(buildResultsTsv());
+        setStatus(`Copied ${currentResults.length} file${currentResults.length === 1 ? "" : "s"} as TSV.`, "ok");
+      } catch (error) {
+        console.error("Could not copy results:", error);
+        setStatus(`Could not copy results: ${error.message}`, "error");
+      } finally {
+        copyResultsButton.disabled = false;
+      }
+    });
+
+    pickFolderButton.addEventListener("click", async () => {
+      if (!window.showDirectoryPicker) {
+        setStatus("This browser does not support folder picking. Use current Chrome or Edge.", "error");
+        return;
+      }
+
+      try {
+        rootHandle = await window.showDirectoryPicker({ mode: "read" });
+        rootName = rootHandle.name;
+        setSearchMode(false);
+        clearResults("Ready to search.");
+        setStatus(`Selected folder: ${rootName}`, "ok");
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          console.error("Folder selection failed:", error);
+          setStatus(`Folder selection failed: ${error.message}`, "error");
+        }
+      }
+    });
+
+    searchButton.addEventListener("click", async () => {
+      if (isSearching) {
+        abortRequested = true;
+        searchButton.disabled = true;
+        setStatus("Aborting search...", "warn");
+        return;
+      }
+
+      if (!rootHandle) return;
+
+      saveInputs();
+
+      let regex;
+      try {
+        regex = new RegExp(patternInput.value, caseInsensitiveInput.checked ? "i" : "");
+      } catch (error) {
+        setStatus(`Invalid regex: ${error.message}`, "error");
+        return;
+      }
+
+      resultsBody.innerHTML = "";
+      currentResults = [];
+      copyResultsButton.hidden = true;
+      downloadAllButton.hidden = true;
+      resetInaccessible();
+      folderListHint.textContent = "";
+      abortRequested = false;
+      setSearchMode(true);
+      setStatus("Searching...");
+
+      let checked = 0;
+      let matched = 0;
+      let skipped = 0;
+      let extractionFailed = 0;
+      let aborted = false;
+
+      // build list of target {handle, folderPath} to walk
+      const lines = parseDirListLines();
+      const targets = [];
+      if (lines.length > 0) {
+        folderListHint.textContent = "Resolving folders…";
+        for (const line of lines) {
+          if (abortRequested) {
+            aborted = true;
+            break;
+          }
+
+          const segments = resolveSegments(line, rootName);
+          if (segments.length === 0) {
+            targets.push({ handle: rootHandle, folderPath: "" });
+            continue;
+          }
+          try {
+            const handle = await navigateToPath(rootHandle, segments);
+            targets.push({ handle, folderPath: segments.join('/') });
+          } catch (error) {
+            console.warn("Could not resolve folder:", line, error);
+            addInaccessible(line, "folder");
+            skipped += 1;
+          }
+        }
+        folderListHint.textContent = aborted
+          ? `${targets.length} of ${lines.length} folders resolved before abort.`
+          : `${targets.length} of ${lines.length} folders resolved.`;
+      } else {
+        targets.push({ handle: rootHandle, folderPath: "" });
+      }
+
+      try {
+        for (const target of targets) {
+          if (abortRequested) {
+            aborted = true;
+            break;
+          }
+
+          for await (const entry of walkDirectory(target.handle, target.folderPath, recursiveInput.checked)) {
+            if (abortRequested) {
+              aborted = true;
+              break;
+            }
+
+            if (entry.kind === "error") {
+              console.warn("Could not access folder:", entry.path, entry.error);
+              addInaccessible(entry.path, "folder");
+              skipped += 1;
+              continue;
+            }
+
+            checked += 1;
+            if (!regex.test(entry.name)) continue;
+
+            try {
+              const file = await entry.handle.getFile();
+              let content = "";
+              if (extractTextInput.checked && isPdfName(entry.name)) {
+                try {
+                  setStatus(`Extracting text from ${entry.name}...`);
+                  content = await extractPdfText(file);
+                } catch (error) {
+                  console.warn("Could not extract PDF text:", entry.name, error);
+                  extractionFailed += 1;
+                }
+              }
+              matched += 1;
+              addResult({ ...entry, file, content });
+            } catch (error) {
+              const path = `${entry.folderPath ? entry.folderPath + "/" : ""}${entry.name}`;
+              console.warn("Could not access file:", path, error);
+              addInaccessible(path, "file");
+              skipped += 1;
+            }
+
+            if (abortRequested) {
+              aborted = true;
+              break;
+            }
+
+            if (matched % 10 === 0) {
+              setStatus(`Searching… ${checked} files checked, ${matched} matches.`);
+            }
+          }
+        }
+
+        if (matched === 0 && !aborted) {
+          clearResults("No matching files found.");
+        }
+
+        const skipNote = skipped ? `, ${skipped} inaccessible` : "";
+        const extractionNote = extractionFailed ? `, ${extractionFailed} text extraction failed` : "";
+        if (aborted) {
+          if (matched === 0) clearResults("Search aborted before any matches were added.");
+          setStatus(`Search aborted. ${checked} files checked, ${matched} matches${skipNote}${extractionNote}.`, "warn");
+        } else {
+          setStatus(`Search complete. ${checked} files checked, ${matched} matches${skipNote}${extractionNote}.`, matched && !extractionFailed ? "ok" : skipped || extractionFailed ? "warn" : "");
+        }
+      } catch (error) {
+        console.error("Search failed:", error);
+        if (matched === 0) clearResults("Search stopped before any matches were added.");
+        setStatus(`Search failed: ${error.message}`, "error");
+      } finally {
+        abortRequested = false;
+        setSearchMode(false);
+      }
+    });
+
+    loadSavedInputs();
+  </script>
+</body>
+</html>
