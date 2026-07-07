@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Folder Regex File Finder</title>
+  <title>FileSystem Bridge</title>
   <style>
     :root {
       color-scheme: light;
@@ -33,6 +33,7 @@
     main {
       width: min(1120px, calc(100vw - 32px));
       margin: 28px auto;
+      padding-bottom: 48px;
     }
 
     h1 {
@@ -66,7 +67,9 @@
       font-size: 13px;
     }
 
-    input[type="text"] {
+    input[type="text"],
+    input[type="number"],
+    select {
       width: 100%;
       min-height: 38px;
       border: 1px solid var(--line);
@@ -92,6 +95,41 @@
       gap: 6px;
       align-items: center;
       color: var(--ink);
+    }
+
+    .checks input.compact-number {
+      width: 72px;
+      min-height: 32px;
+      flex: 0 0 72px;
+    }
+
+    .search-fields {
+      display: grid;
+      gap: 6px;
+    }
+
+    .search-mode-label {
+      width: fit-content;
+      min-height: unset;
+      border: 0;
+      padding: 0 20px 0 0;
+      color: var(--muted);
+      background: transparent;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .presets {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto auto auto auto auto;
+      gap: 8px;
+      align-items: end;
+      padding: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
     }
 
     button {
@@ -131,7 +169,8 @@
       cursor: not-allowed;
     }
 
-    .folder-list-panel {
+    .folder-list-panel,
+    .columns-panel {
       margin-top: 10px;
       background: var(--panel);
       border: 1px solid var(--line);
@@ -140,7 +179,8 @@
       font-size: 13px;
     }
 
-    .folder-list-panel summary {
+    .folder-list-panel summary,
+    .columns-panel summary {
       padding: 10px 14px;
       cursor: pointer;
       color: var(--muted);
@@ -152,23 +192,27 @@
       gap: 6px;
     }
 
-    .folder-list-panel summary::before {
+    .folder-list-panel summary::before,
+    .columns-panel summary::before {
       content: "▶";
       font-size: 10px;
       transition: transform 0.15s;
     }
 
-    .folder-list-panel[open] summary::before {
+    .folder-list-panel[open] summary::before,
+    .columns-panel[open] summary::before {
       transform: rotate(90deg);
     }
 
-    .folder-list-body {
+    .folder-list-body,
+    .columns-body {
       padding: 0 14px 12px;
       display: grid;
       gap: 8px;
     }
 
-    .folder-list-body textarea {
+    .folder-list-body textarea,
+    .columns-preview {
       width: 100%;
       height: 120px;
       border: 1px solid var(--line);
@@ -180,17 +224,168 @@
       resize: vertical;
     }
 
-    .folder-list-body textarea:focus {
+    .columns-preview {
+      min-height: 180px;
+      white-space: pre-wrap;
+      overflow: auto;
+    }
+
+    .folder-list-body textarea:focus,
+    .columns-preview:focus {
       outline: 2px solid var(--accent);
       outline-offset: -1px;
     }
 
-    .folder-list-footer {
+    .folder-list-footer,
+    .columns-footer {
       display: flex;
       justify-content: space-between;
       align-items: center;
       color: var(--muted);
       font-size: 12px;
+    }
+
+    .columns-footer {
+      align-items: flex-end;
+      gap: 10px;
+    }
+
+    .column-tags {
+      display: flex;
+      flex: 1 1 auto;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .column-tag {
+      display: inline-flex;
+      align-items: center;
+      width: min(100%, 420px);
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink);
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .column-tag.is-drag-over {
+      box-shadow: inset 0 0 0 2px var(--accent);
+    }
+
+    .column-tag-handle {
+      align-self: stretch;
+      min-width: 32px;
+      min-height: 38px;
+      border: 0;
+      border-right: 1px solid var(--line);
+      border-radius: 0;
+      padding: 0 8px;
+      color: var(--muted);
+      background: transparent;
+      cursor: grab;
+    }
+
+    .column-tag-handle:active {
+      cursor: grabbing;
+    }
+
+    .column-tag-label,
+    .column-tag input {
+      min-width: 0;
+      flex: 1 1 auto;
+      padding: 7px 10px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font: inherit;
+    }
+
+    .column-tag-label {
+      display: grid;
+      gap: 2px;
+    }
+
+    .column-tag-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .column-tag-meta {
+      color: var(--muted);
+      font-size: 11px;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    .column-tag-label {
+      cursor: text;
+    }
+
+    .column-tag-editor {
+      display: grid;
+      flex: 1 1 auto;
+      min-width: 0;
+      grid-template-columns: 118px minmax(0, 1fr);
+      gap: 0;
+    }
+
+    .column-tag input,
+    .column-tag textarea,
+    .column-tag select {
+      width: 100%;
+      min-height: 36px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .column-tag input:focus,
+    .column-tag textarea:focus,
+    .column-tag select:focus {
+      outline: 0;
+    }
+
+    .column-tag input,
+    .column-tag textarea {
+      padding: 7px 10px;
+    }
+
+    .column-tag select {
+      padding: 7px 24px 7px 8px;
+      border-right: 1px solid var(--line);
+      color: var(--muted);
+      font: inherit;
+    }
+
+    .column-tag-name {
+      border-bottom: 1px solid var(--line) !important;
+    }
+
+    .column-tag-pattern {
+      grid-column: 1 / -1;
+      min-height: 44px !important;
+      resize: vertical;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      font: inherit;
+    }
+
+    .column-tag-remove {
+      min-width: 34px;
+      min-height: 36px;
+      border: 0;
+      border-radius: 0;
+      padding: 0 10px;
+      color: var(--muted);
+      background: transparent;
+    }
+
+    .column-tag-remove:hover {
+      color: var(--danger);
+      background: #fff8f8;
     }
 
     .status {
@@ -259,11 +454,12 @@
 
     .results {
       margin-top: 12px;
-      overflow: hidden;
+      overflow: auto;
     }
 
     table {
-      width: 100%;
+      width: max-content;
+      min-width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
     }
@@ -275,6 +471,7 @@
       text-align: left;
       vertical-align: middle;
       font-size: 14px;
+      user-select: none;
     }
 
     th {
@@ -288,12 +485,12 @@
     }
 
     .name {
-      width: 28%;
+      width: 280px;
       overflow-wrap: anywhere;
     }
 
     .path {
-      width: 34%;
+      width: 340px;
       color: var(--muted);
       overflow-wrap: anywhere;
     }
@@ -304,27 +501,47 @@
     }
 
     .action {
-      width: 220px;
-      text-align: right;
+      width: 140px;
       white-space: nowrap;
     }
 
     .content {
       width: 110px;
-      text-align: right;
       white-space: nowrap;
     }
 
-    button.bulk-action {
-      min-height: unset;
-      min-width: 72px;
-      padding: 2px 7px;
-      font-size: 11px;
-      border-radius: 4px;
-      margin-left: 6px;
-      vertical-align: middle;
+    .dynamic {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
+    .dynamic-header-label {
+      display: block;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    th.selectable-column,
+    td.selectable-cell {
+      cursor: cell;
+    }
+
+    th.is-selected,
+    td.is-selected {
+      background: #dbeafe;
+      box-shadow: inset 0 0 0 1px var(--accent);
+      color: var(--ink);
+    }
+
+    td.selectable-cell:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    th.action button,
     td.action button {
       min-width: 118px;
     }
@@ -349,68 +566,78 @@
         grid-template-columns: 1fr;
       }
 
+      .presets {
+        grid-template-columns: 1fr;
+      }
+
       .checks {
         flex-wrap: wrap;
-      }
-
-      table,
-      thead,
-      tbody,
-      tr,
-      th,
-      td {
-        display: block;
-      }
-
-      thead {
-        display: none;
-      }
-
-      tr {
-        border-bottom: 1px solid var(--line);
-        padding: 10px;
-      }
-
-      td {
-        width: 100% !important;
-        border: 0;
-        padding: 4px 0;
-      }
-
-      .action {
-        text-align: left;
-        padding-top: 8px;
       }
     }
   </style>
 </head>
 <body>
   <main>
-    <h1>Folder Regex File Finder</h1>
+    <h1>FileSystem Bridge</h1>
 
     <section class="toolbar" aria-label="Search controls">
-      <label>
-        Regex filename search
-        <input id="pattern" type="text" value="FO.*\\.pdf$" spellcheck="false" autocomplete="off">
-      </label>
+      <div class="search-fields">
+        <label>
+          <select id="searchMode" class="search-mode-label" aria-label="Search mode">
+            <option value="folder">Regex Folder Search</option>
+            <option value="filename" selected>Regex File Search</option>
+            <option value="path">Regex Path Search</option>
+          </select>
+          <input id="pattern" type="text" value="FO.*\\.pdf$" spellcheck="false" autocomplete="off">
+        </label>
+      </div>
 
       <div class="checks">
-        <label><input id="recursive" type="checkbox" checked> Recursive</label>
+        <label><input id="recursive" type="checkbox" checked> Recurse <input id="recurseDepth" class="compact-number" type="number" min="1" step="1" placeholder="depth"></label>
         <label><input id="caseInsensitive" type="checkbox" checked> Ignore case</label>
-        <label><input id="extractText" type="checkbox"> Extract PDF text</label>
+        <label><input id="extractText" type="checkbox"> Extract <input id="extractPage" class="compact-number" type="number" min="1" step="1" placeholder="page"></label>
       </div>
 
       <button id="pickFolder" type="button">Choose Folder</button>
       <button id="search" class="primary" type="button" disabled>Search</button>
     </section>
 
-    <details class="folder-list-panel" id="folderListPanel">
+    <details class="folder-list-panel" id="folderListPanel" open>
       <summary>Limit search to specific folders <span id="folderListCount"></span></summary>
       <div class="folder-list-body">
         <textarea id="dirList" spellcheck="false" placeholder="Paste one folder path per line. Accepts:&#10;  • file://server/path/to/folder&#10;  • relative/path/from/root&#10;Leave empty to search the whole selected folder."></textarea>
         <div class="folder-list-footer">
           <span id="folderListHint"></span>
           <button id="clearDirList" type="button">Clear</button>
+        </div>
+      </div>
+    </details>
+
+    <section class="presets" aria-label="Preset controls">
+      <label>
+        Preset name
+        <input id="presetName" type="text" spellcheck="false" autocomplete="off" placeholder="Example search">
+      </label>
+      <label>
+        Saved presets
+        <select id="presetSelect"></select>
+      </label>
+      <button id="savePreset" type="button">Save Preset</button>
+      <button id="loadPreset" type="button">Load</button>
+      <button id="deletePreset" type="button">Delete</button>
+      <button id="exportPresets" type="button">Export</button>
+      <button id="importPresets" type="button">Import</button>
+      <input id="importPresetsFile" type="file" accept="application/json,.json" hidden>
+    </section>
+
+    <details class="columns-panel" id="columnsPanel" open>
+      <summary>Columns <span id="columnCount"></span></summary>
+      <div class="columns-body">
+        <button id="previewColumnSource" type="button">Preview First Result Text</button>
+        <textarea id="columnPreview" class="columns-preview" readonly spellcheck="false" placeholder="Run a search, then preview the first file's extracted text here. Scroll and select text to build regex columns."></textarea>
+        <div class="columns-footer">
+          <div id="columnTags" class="column-tags" aria-label="Regex columns"></div>
+          <button id="addColumn" type="button">Add Column</button>
         </div>
       </div>
     </details>
@@ -426,14 +653,15 @@
     </details>
 
     <section class="results" aria-label="Search results">
-      <table>
+      <table id="resultsTable">
+        <colgroup id="resultColumns"></colgroup>
         <thead>
-          <tr>
-            <th class="name">File</th>
-            <th class="path">Folder</th>
-            <th class="size">Size</th>
-            <th class="content">Content</th>
-            <th class="action">Action <button id="copyResults" class="bulk-action" type="button" hidden>Copy</button><button id="downloadAll" class="bulk-action" type="button" hidden>↓ All</button></th>
+          <tr id="headerRow">
+            <th class="name selectable-column" data-column-index="0">File</th>
+            <th class="path selectable-column" data-column-index="1">Folder</th>
+            <th class="size selectable-column" data-column-index="2">Size</th>
+            <th class="content selectable-column" data-column-index="3">Content</th>
+            <th class="action"><button id="downloadAll" type="button" hidden>Download All</button></th>
           </tr>
         </thead>
         <tbody id="resultsBody">
@@ -447,19 +675,38 @@
   <script>
     const pickFolderButton = document.querySelector("#pickFolder");
     const searchButton = document.querySelector("#search");
+    const searchModeSelect = document.querySelector("#searchMode");
     const patternInput = document.querySelector("#pattern");
     const recursiveInput = document.querySelector("#recursive");
+    const recurseDepthInput = document.querySelector("#recurseDepth");
     const caseInsensitiveInput = document.querySelector("#caseInsensitive");
     const extractTextInput = document.querySelector("#extractText");
+    const extractPageInput = document.querySelector("#extractPage");
+    const addColumnButton = document.querySelector("#addColumn");
+    const previewColumnSourceButton = document.querySelector("#previewColumnSource");
+    const columnPreview = document.querySelector("#columnPreview");
+    const columnTags = document.querySelector("#columnTags");
+    const columnCount = document.querySelector("#columnCount");
+    const presetNameInput = document.querySelector("#presetName");
+    const presetSelect = document.querySelector("#presetSelect");
+    const savePresetButton = document.querySelector("#savePreset");
+    const loadPresetButton = document.querySelector("#loadPreset");
+    const deletePresetButton = document.querySelector("#deletePreset");
+    const exportPresetsButton = document.querySelector("#exportPresets");
+    const importPresetsButton = document.querySelector("#importPresets");
+    const importPresetsFileInput = document.querySelector("#importPresetsFile");
     const statusBox = document.querySelector("#status");
+    const resultsTable = document.querySelector("#resultsTable");
+    const resultColumns = document.querySelector("#resultColumns");
     const resultsBody = document.querySelector("#resultsBody");
     const dirListTextarea = document.querySelector("#dirList");
     const clearDirListButton = document.querySelector("#clearDirList");
     const folderListPanel = document.querySelector("#folderListPanel");
+    const columnsPanel = document.querySelector("#columnsPanel");
     const folderListCount = document.querySelector("#folderListCount");
     const folderListHint = document.querySelector("#folderListHint");
-    const copyResultsButton = document.querySelector("#copyResults");
     const downloadAllButton = document.querySelector("#downloadAll");
+    const headerRow = document.querySelector("#headerRow");
     const inaccessibleFoldersSection = document.querySelector("#inaccessibleFoldersSection");
     const inaccessibleFoldersSummary = document.querySelector("#inaccessibleFoldersSummary");
     const inaccessibleFoldersList = document.querySelector("#inaccessibleFoldersList");
@@ -469,26 +716,84 @@
 
     const storageKeys = {
       pattern: "fsBridge.pattern",
+      searchMode: "fsBridge.searchMode",
+      recursive: "fsBridge.recursive",
+      caseInsensitive: "fsBridge.caseInsensitive",
       dirList: "fsBridge.dirList",
-      dirListOpen: "fsBridge.dirListOpen",
       extractText: "fsBridge.extractText",
+      extractPage: "fsBridge.extractPage",
+      recurseDepth: "fsBridge.recurseDepth",
+      columns: "fsBridge.columns",
+      presets: "fsBridge.presets",
+      activePreset: "fsBridge.activePreset",
+    };
+
+    const sessionKeys = {
+      dirListOpen: "fsBridge.session.dirListOpen",
+      columnsOpen: "fsBridge.session.columnsOpen",
     };
 
     let rootHandle = null;
     let rootName = "";
     let currentResults = [];
+    let dynamicColumns = [];
+    let activeColumnIndex = null;
+    let selectedCells = new Set();
+    let selectionAnchor = null;
     let isSearching = false;
     let abortRequested = false;
 
+    const tableColumnWidths = {
+      name: 280,
+      path: 340,
+      size: 90,
+      content: 110,
+      action: 140,
+    };
+
     function loadSavedInputs() {
       const savedPattern = localStorage.getItem(storageKeys.pattern);
+      const savedSearchMode = localStorage.getItem(storageKeys.searchMode);
+      const savedRecursive = localStorage.getItem(storageKeys.recursive);
+      const savedCaseInsensitive = localStorage.getItem(storageKeys.caseInsensitive);
       const savedDirList = localStorage.getItem(storageKeys.dirList);
-      const savedDirListOpen = localStorage.getItem(storageKeys.dirListOpen);
+      const savedDirListOpen = sessionStorage.getItem(sessionKeys.dirListOpen);
+      const savedColumnsOpen = sessionStorage.getItem(sessionKeys.columnsOpen);
       const savedExtractText = localStorage.getItem(storageKeys.extractText);
+      const savedExtractPage = localStorage.getItem(storageKeys.extractPage);
+      const savedRecurseDepth = localStorage.getItem(storageKeys.recurseDepth);
+      const savedColumns = localStorage.getItem(storageKeys.columns);
+      const savedActivePreset = localStorage.getItem(storageKeys.activePreset);
       if (savedPattern !== null) patternInput.value = savedPattern;
+      if (savedSearchMode !== null && [...searchModeSelect.options].some(option => option.value === savedSearchMode)) {
+        searchModeSelect.value = savedSearchMode;
+      }
+      if (savedRecursive !== null) recursiveInput.checked = savedRecursive === "true";
+      if (savedCaseInsensitive !== null) caseInsensitiveInput.checked = savedCaseInsensitive === "true";
       if (savedDirList !== null) dirListTextarea.value = savedDirList;
       if (savedDirListOpen !== null) folderListPanel.open = savedDirListOpen === "true";
+      if (savedColumnsOpen !== null) columnsPanel.open = savedColumnsOpen === "true";
       if (savedExtractText !== null) extractTextInput.checked = savedExtractText === "true";
+      if (savedExtractPage !== null) extractPageInput.value = savedExtractPage;
+      if (savedRecurseDepth !== null) recurseDepthInput.value = savedRecurseDepth;
+      if (savedColumns !== null) {
+        try {
+          const parsedColumns = JSON.parse(savedColumns);
+          dynamicColumns = Array.isArray(parsedColumns) ? parsedColumns.map(normalizeColumn) : [];
+        } catch (error) {
+          console.warn("Could not load saved columns:", error);
+        }
+      }
+      const presets = readPresets();
+      if (savedActivePreset && presets[savedActivePreset]) {
+        presetNameInput.value = savedActivePreset;
+        applyPresetData(presets[savedActivePreset]);
+        renderPresetOptions(savedActivePreset);
+      } else {
+        renderHeaders();
+        renderColumnTags();
+        renderPresetOptions();
+      }
       updateFolderListCount();
     }
 
@@ -502,8 +807,174 @@
 
     function saveInputs() {
       localStorage.setItem(storageKeys.pattern, patternInput.value);
+      localStorage.setItem(storageKeys.searchMode, searchModeSelect.value);
+      localStorage.setItem(storageKeys.recursive, String(recursiveInput.checked));
+      localStorage.setItem(storageKeys.caseInsensitive, String(caseInsensitiveInput.checked));
       localStorage.setItem(storageKeys.dirList, dirListTextarea.value);
       localStorage.setItem(storageKeys.extractText, String(extractTextInput.checked));
+      localStorage.setItem(storageKeys.extractPage, extractPageInput.value.trim());
+      localStorage.setItem(storageKeys.recurseDepth, recurseDepthInput.value.trim());
+      saveColumns();
+    }
+
+    function readPresets() {
+      const savedPresets = localStorage.getItem(storageKeys.presets);
+      if (!savedPresets) return {};
+
+      try {
+        const presets = JSON.parse(savedPresets);
+        return presets && typeof presets === "object" && !Array.isArray(presets) ? presets : {};
+      } catch (error) {
+        console.warn("Could not load presets:", error);
+        return {};
+      }
+    }
+
+    function writePresets(presets) {
+      localStorage.setItem(storageKeys.presets, JSON.stringify(presets));
+    }
+
+    function saveActivePresetName(name) {
+      if (name) {
+        localStorage.setItem(storageKeys.activePreset, name);
+      } else {
+        localStorage.removeItem(storageKeys.activePreset);
+      }
+    }
+
+    function presetExportTimestamp(date = new Date()) {
+      return date.toISOString().replace(/\.\d{3}Z$/, "Z").replace(/[:]/g, "-");
+    }
+
+    function normalizeImportedPresets(data) {
+      const presets = data?.presets ?? data;
+      return presets && typeof presets === "object" && !Array.isArray(presets) ? presets : null;
+    }
+
+    function uniqueImportedPresetName(baseName, presets, timestamp) {
+      const preferred = `${baseName} ${timestamp}`;
+      if (!Object.prototype.hasOwnProperty.call(presets, preferred)) return preferred;
+
+      let counter = 2;
+      while (Object.prototype.hasOwnProperty.call(presets, `${preferred} ${counter}`)) {
+        counter += 1;
+      }
+      return `${preferred} ${counter}`;
+    }
+
+    function exportPresets() {
+      const presets = readPresets();
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        source: "FileSystem Bridge",
+        presets,
+      };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `filesystem-bridge-presets-${presetExportTimestamp()}.json`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      setStatus(`Exported ${Object.keys(presets).length} preset${Object.keys(presets).length === 1 ? "" : "s"}.`, "ok");
+    }
+
+    async function importPresetsFromFile(file) {
+      if (!file) return;
+
+      try {
+        const imported = normalizeImportedPresets(JSON.parse(await file.text()));
+        if (!imported) {
+          setStatus("That file does not contain FileSystem Bridge presets.", "error");
+          return;
+        }
+
+        const presets = readPresets();
+        const timestamp = presetExportTimestamp();
+        let importedCount = 0;
+        let renamedCount = 0;
+
+        Object.entries(imported).forEach(([name, preset]) => {
+          const trimmedName = String(name || "").trim();
+          if (!trimmedName) return;
+
+          const targetName = Object.prototype.hasOwnProperty.call(presets, trimmedName)
+            ? uniqueImportedPresetName(trimmedName, presets, timestamp)
+            : trimmedName;
+          if (targetName !== trimmedName) renamedCount += 1;
+          presets[targetName] = preset;
+          importedCount += 1;
+        });
+
+        writePresets(presets);
+        renderPresetOptions(presetSelect.value);
+        const renameNote = renamedCount ? ` Renamed ${renamedCount} name collision${renamedCount === 1 ? "" : "s"}.` : "";
+        setStatus(`Imported ${importedCount} preset${importedCount === 1 ? "" : "s"}.${renameNote}`, "ok");
+      } catch (error) {
+        console.warn("Could not import FileSystem Bridge presets:", error);
+        setStatus("Could not import presets. Make sure the file is valid JSON.", "error");
+      }
+    }
+
+    function renderPresetOptions(selectedName = presetSelect.value) {
+      const presets = readPresets();
+      const names = Object.keys(presets).sort((a, b) => a.localeCompare(b));
+
+      presetSelect.innerHTML = "";
+      const emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = names.length ? "Select preset" : "No presets saved";
+      presetSelect.append(emptyOption);
+
+      for (const name of names) {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        presetSelect.append(option);
+      }
+
+      const resolvedName = names.includes(selectedName) ? selectedName : "";
+      presetSelect.value = resolvedName;
+      loadPresetButton.disabled = !resolvedName;
+      deletePresetButton.disabled = !resolvedName;
+      saveActivePresetName(resolvedName);
+    }
+
+    function getCurrentPresetData() {
+      return {
+        pattern: patternInput.value,
+        searchMode: searchModeSelect.value,
+        recursive: recursiveInput.checked,
+        recurseDepth: recurseDepthInput.value,
+        caseInsensitive: caseInsensitiveInput.checked,
+        extractText: extractTextInput.checked,
+        extractPage: extractPageInput.value,
+        dirList: dirListTextarea.value,
+        columns: dynamicColumns.map(serializeColumn),
+      };
+    }
+
+    function applyPresetData(preset) {
+      patternInput.value = String(preset.pattern || "");
+      const mode = String(preset.searchMode || "filename");
+      searchModeSelect.value = [...searchModeSelect.options].some(option => option.value === mode) ? mode : "filename";
+      recursiveInput.checked = Boolean(preset.recursive);
+      recurseDepthInput.value = String(preset.recurseDepth || "");
+      caseInsensitiveInput.checked = preset.caseInsensitive !== false;
+      extractTextInput.checked = Boolean(preset.extractText);
+      extractPageInput.value = String(preset.extractPage || "");
+      dirListTextarea.value = String(preset.dirList || "");
+      dynamicColumns = Array.isArray(preset.columns)
+        ? preset.columns.map(normalizeColumn)
+        : [];
+
+      updateFolderListCount();
+      saveInputs();
+      renderHeaders();
+      renderColumnTags();
+      renderRows();
     }
 
     function setStatus(message, type = "") {
@@ -525,10 +996,13 @@
 
     function clearResults(message) {
       resultsBody.innerHTML = "";
+      selectedCells = new Set();
+      selectionAnchor = null;
+      updateSelectionUi();
       const row = document.createElement("tr");
       const cell = document.createElement("td");
       cell.className = "empty";
-      cell.colSpan = 5;
+      cell.colSpan = 5 + dynamicColumns.length;
       cell.textContent = message;
       row.append(cell);
       resultsBody.append(row);
@@ -538,7 +1012,43 @@
       return /\.pdf$/i.test(name);
     }
 
-    async function extractPdfText(file) {
+    function getFullPath(entry) {
+      return `${entry.folderPath ? entry.folderPath + "/" : ""}${entry.name}`;
+    }
+
+    function getFolderName(folderPath) {
+      if (!folderPath) return rootName;
+      const parts = folderPath.split("/").filter(Boolean);
+      return parts.at(-1) || rootName;
+    }
+
+    function getSearchValue(entry, mode) {
+      if (mode === "folder") return getFolderName(entry.folderPath);
+      if (mode === "path") return getFullPath(entry);
+      return entry.name;
+    }
+
+    function getOptionalPositiveInteger(input) {
+      const value = input.value.trim();
+      if (!value) return null;
+      const number = Number(value);
+      return Number.isInteger(number) && number >= 1 ? number : NaN;
+    }
+
+    function getExtractPageNumber() {
+      return getOptionalPositiveInteger(extractPageInput);
+    }
+
+    function getRecurseDepth() {
+      return getOptionalPositiveInteger(recurseDepthInput);
+    }
+
+    function formatExtractTarget(name) {
+      const pageNumber = getExtractPageNumber();
+      return Number.isInteger(pageNumber) ? `${name} page ${pageNumber}` : name;
+    }
+
+    async function extractPdfText(file, requestedPageNumber = null) {
       if (!window.pdfjsLib) {
         throw new Error("PDF text extraction library did not load.");
       }
@@ -548,7 +1058,15 @@
       const pages = [];
 
       try {
-        for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+        if (requestedPageNumber !== null) {
+          if (requestedPageNumber > document.numPages) {
+            throw new Error(`PDF only has ${document.numPages} page${document.numPages === 1 ? "" : "s"}.`);
+          }
+        }
+
+        const firstPage = requestedPageNumber ?? 1;
+        const lastPage = requestedPageNumber ?? document.numPages;
+        for (let pageNumber = firstPage; pageNumber <= lastPage; pageNumber += 1) {
           const page = await document.getPage(pageNumber);
           const textContent = await page.getTextContent();
           pages.push(textContent.items.map(item => item.str).join(" ").trim());
@@ -560,15 +1078,30 @@
       return pages.filter(Boolean).join("\n");
     }
 
-    async function* walkDirectory(directoryHandle, folderPath, recursive) {
+    async function* walkDirectory(directoryHandle, folderPath, recursive, maxDepth = null, depth = 0) {
       try {
         for await (const [name, handle] of directoryHandle.entries()) {
           if (handle.kind === "file") {
             yield { name, handle, folderPath };
-          } else if (recursive && handle.kind === "directory") {
+          } else if (recursive && handle.kind === "directory" && (maxDepth === null || depth < maxDepth)) {
             const childPath = folderPath ? `${folderPath}/${name}` : name;
-            yield* walkDirectory(handle, childPath, recursive);
+            yield* walkDirectory(handle, childPath, recursive, maxDepth, depth + 1);
           }
+        }
+      } catch (error) {
+        yield { kind: "error", path: folderPath || directoryHandle.name, error };
+      }
+    }
+
+    async function* walkFolders(directoryHandle, folderPath, recursive, maxDepth = null, depth = 0) {
+      yield { handle: directoryHandle, folderPath };
+      if (!recursive || (maxDepth !== null && depth >= maxDepth)) return;
+
+      try {
+        for await (const [name, handle] of directoryHandle.entries()) {
+          if (handle.kind !== "directory") continue;
+          const childPath = folderPath ? `${folderPath}/${name}` : name;
+          yield* walkFolders(handle, childPath, recursive, maxDepth, depth + 1);
         }
       } catch (error) {
         yield { kind: "error", path: folderPath || directoryHandle.name, error };
@@ -634,8 +1167,28 @@
       localStorage.setItem(storageKeys.pattern, patternInput.value);
     });
 
+    searchModeSelect.addEventListener("change", () => {
+      localStorage.setItem(storageKeys.searchMode, searchModeSelect.value);
+    });
+
+    recursiveInput.addEventListener("change", () => {
+      localStorage.setItem(storageKeys.recursive, String(recursiveInput.checked));
+    });
+
+    caseInsensitiveInput.addEventListener("change", () => {
+      localStorage.setItem(storageKeys.caseInsensitive, String(caseInsensitiveInput.checked));
+    });
+
     extractTextInput.addEventListener("change", () => {
       localStorage.setItem(storageKeys.extractText, String(extractTextInput.checked));
+    });
+
+    extractPageInput.addEventListener("input", () => {
+      localStorage.setItem(storageKeys.extractPage, extractPageInput.value.trim());
+    });
+
+    recurseDepthInput.addEventListener("input", () => {
+      localStorage.setItem(storageKeys.recurseDepth, recurseDepthInput.value.trim());
     });
 
     dirListTextarea.addEventListener("input", () => {
@@ -644,7 +1197,11 @@
     });
 
     folderListPanel.addEventListener("toggle", () => {
-      localStorage.setItem(storageKeys.dirListOpen, String(folderListPanel.open));
+      sessionStorage.setItem(sessionKeys.dirListOpen, String(folderListPanel.open));
+    });
+
+    columnsPanel.addEventListener("toggle", () => {
+      sessionStorage.setItem(sessionKeys.columnsOpen, String(columnsPanel.open));
     });
 
     clearDirListButton.addEventListener("click", () => {
@@ -653,65 +1210,540 @@
       localStorage.setItem(storageKeys.dirList, dirListTextarea.value);
     });
 
-    function addResult(result) {
-      const row = document.createElement("tr");
-      const nameCell = document.createElement("td");
-      const pathCell = document.createElement("td");
-      const sizeCell = document.createElement("td");
-      const contentCell = document.createElement("td");
-      const actionCell = document.createElement("td");
-      const contentButton = document.createElement("button");
-      const downloadButton = document.createElement("button");
+    presetSelect.addEventListener("change", () => {
+      const name = presetSelect.value;
+      presetNameInput.value = name;
+      renderPresetOptions(name);
 
-      nameCell.className = "name";
-      pathCell.className = "path";
-      sizeCell.className = "size";
-      contentCell.className = "content";
-      actionCell.className = "action";
+      if (!name) return;
+      const preset = readPresets()[name];
+      if (!preset) return;
+      applyPresetData(preset);
+      setStatus(`Loaded preset: ${name}`, "ok");
+    });
 
-      nameCell.textContent = result.name;
-      pathCell.textContent = result.folderPath || rootName;
-      sizeCell.textContent = formatBytes(result.file.size);
-      contentButton.textContent = "Copy";
-      contentButton.type = "button";
-      contentButton.disabled = !result.content;
-      contentButton.addEventListener("click", async () => {
-        try {
-          await writeClipboardText(result.content || "");
-          setStatus(`Copied content from ${result.name}.`, "ok");
-        } catch (error) {
-          console.error(`Could not copy content from "${result.name}":`, error);
-          setStatus(`Could not copy content from "${result.name}": ${error.message}`, "error");
+    savePresetButton.addEventListener("click", () => {
+      const name = presetNameInput.value.trim();
+      if (!name) {
+        setStatus("Enter a preset name.", "error");
+        return;
+      }
+
+      const presets = readPresets();
+      presets[name] = getCurrentPresetData();
+      writePresets(presets);
+      renderPresetOptions(name);
+      setStatus(`Saved preset: ${name}`, "ok");
+    });
+
+    loadPresetButton.addEventListener("click", () => {
+      const name = presetSelect.value;
+      const preset = readPresets()[name];
+      if (!preset) {
+        setStatus("Select a saved preset to load.", "error");
+        renderPresetOptions();
+        return;
+      }
+
+      presetNameInput.value = name;
+      applyPresetData(preset);
+      renderPresetOptions(name);
+      setStatus(`Loaded preset: ${name}`, "ok");
+    });
+
+    deletePresetButton.addEventListener("click", () => {
+      const name = presetSelect.value;
+      if (!name) {
+        setStatus("Select a saved preset to delete.", "error");
+        return;
+      }
+
+      const presets = readPresets();
+      delete presets[name];
+      writePresets(presets);
+      presetNameInput.value = "";
+      renderPresetOptions();
+      setStatus(`Deleted preset: ${name}`, "ok");
+    });
+
+    exportPresetsButton.addEventListener("click", exportPresets);
+
+    importPresetsButton.addEventListener("click", () => {
+      importPresetsFileInput.click();
+    });
+
+    importPresetsFileInput.addEventListener("change", async event => {
+      const input = event.currentTarget;
+      await importPresetsFromFile(input.files?.[0]);
+      input.value = "";
+    });
+
+    function normalizeColumn(column) {
+      if (typeof column === "string") {
+        return { pattern: column, name: "", source: "content" };
+      }
+
+      return {
+        pattern: String(column?.pattern || ""),
+        name: String(column?.name || ""),
+        source: ["content", "file", "folder", "path", "size"].includes(column?.source) ? column.source : "content",
+      };
+    }
+
+    function serializeColumn(column) {
+      const normalized = normalizeColumn(column);
+      return {
+        pattern: normalized.pattern,
+        name: normalized.name,
+        source: normalized.source,
+      };
+    }
+
+    function saveColumns() {
+      localStorage.setItem(storageKeys.columns, JSON.stringify(dynamicColumns.map(serializeColumn)));
+    }
+
+    function getColumnLabel(column, index) {
+      const normalized = normalizeColumn(column);
+      const name = normalized.name.trim();
+      const pattern = normalized.pattern.trim();
+      return name || pattern || `Column ${index + 1}`;
+    }
+
+    function getColumnSourceLabel(source) {
+      return {
+        content: "Content",
+        file: "File",
+        folder: "Folder",
+        path: "Path",
+        size: "Size",
+      }[source] || "Content";
+    }
+
+    function setColumnPreview(text) {
+      columnPreview.value = text;
+    }
+
+    function formatCharCount(text) {
+      const count = String(text || "").length;
+      return count ? `${count.toLocaleString()} char${count === 1 ? "" : "s"}` : "";
+    }
+
+    function makeCell(rowIndex, columnIndex, className, value) {
+      const cell = document.createElement("td");
+      cell.className = `${className} selectable-cell`.trim();
+      cell.dataset.rowIndex = String(rowIndex);
+      cell.dataset.columnIndex = String(columnIndex);
+      cell.tabIndex = 0;
+      cell.textContent = value;
+      cell.addEventListener("click", event => selectCell(rowIndex, columnIndex, event));
+      cell.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          selectCell(rowIndex, columnIndex, event);
         }
       });
+      return cell;
+    }
+
+    function makeColumnHeader(className, columnIndex, label) {
+      const th = document.createElement("th");
+      th.className = `${className} selectable-column`.trim();
+      th.dataset.columnIndex = String(columnIndex);
+      th.textContent = label;
+      th.addEventListener("click", event => selectColumn(columnIndex, event));
+      return th;
+    }
+
+    function extractRegexValue(text, pattern) {
+      const source = String(text || "");
+      const trimmed = pattern.trim();
+      if (!source || !trimmed) return "";
+
+      try {
+        const regex = new RegExp(trimmed, "im");
+        const match = source.match(regex);
+        if (!match) return "";
+        return match[1] ?? match[0] ?? "";
+      } catch {
+        return "";
+      }
+    }
+
+    function getColumnSourceText(result, column) {
+      if (!result) return "";
+      const source = normalizeColumn(column).source;
+
+      if (source === "file") return result.kind === "folder" ? getFolderName(result.folderPath) : result.name;
+      if (source === "folder") return result.folderPath || rootName;
+      if (source === "path") return result.kind === "folder" ? result.folderPath || rootName : getFullPath(result);
+      if (source === "size") return result.kind === "folder" ? "" : formatBytes(result.file.size);
+      return result.kind === "folder" ? "" : result.content || "";
+    }
+
+    function columnNeedsContent(column) {
+      const normalized = normalizeColumn(column);
+      return normalized.source === "content" && normalized.pattern.trim();
+    }
+
+    function getDisplayCellValue(result, columnIndex) {
+      if (!result) return "";
+      if (result.kind === "folder") {
+        if (columnIndex === 0) return getFolderName(result.folderPath);
+        if (columnIndex === 1) return result.folderPath || rootName;
+        return "";
+      }
+      if (columnIndex === 0) return result.name;
+      if (columnIndex === 1) return result.folderPath || rootName;
+      if (columnIndex === 2) return formatBytes(result.file.size);
+      if (columnIndex === 3) return formatCharCount(result.content);
+      const dynamicColumn = dynamicColumns[columnIndex - 4];
+      return dynamicColumn ? extractRegexValue(getColumnSourceText(result, dynamicColumn), dynamicColumn.pattern) : "";
+    }
+
+    function getClipboardCellValue(result, columnIndex) {
+      if (result?.kind === "folder") return getDisplayCellValue(result, columnIndex);
+      if (columnIndex === 3) return result?.content || "";
+      return getDisplayCellValue(result, columnIndex);
+    }
+
+    function getDynamicColumnWidth(index) {
+      const columnIndex = index + 4;
+      const values = currentResults
+        .map(result => getDisplayCellValue(result, columnIndex).trim())
+        .filter(Boolean)
+        .slice(0, 200);
+
+      if (!values.length) return 120;
+
+      const lengths = values.map(value => value.length).sort((a, b) => a - b);
+      const average = lengths.reduce((sum, length) => sum + length, 0) / lengths.length;
+      const upperMiddle = lengths[Math.min(lengths.length - 1, Math.floor(lengths.length * 0.75))];
+      const comfortableChars = Math.ceil(Math.max(average + 4, Math.min(upperMiddle + 2, average + 8)));
+      return Math.min(220, Math.max(96, comfortableChars * 8 + 24));
+    }
+
+    function getTableColumnWidths() {
+      return [
+        tableColumnWidths.name,
+        tableColumnWidths.path,
+        tableColumnWidths.size,
+        tableColumnWidths.content,
+        ...dynamicColumns.map((_, index) => getDynamicColumnWidth(index)),
+        tableColumnWidths.action,
+      ];
+    }
+
+    function renderResultColumns() {
+      const widths = getTableColumnWidths();
+      resultColumns.innerHTML = "";
+      widths.forEach(width => {
+        const col = document.createElement("col");
+        col.style.width = `${width}px`;
+        resultColumns.append(col);
+      });
+      resultsTable.style.width = `${widths.reduce((sum, width) => sum + width, 0)}px`;
+    }
+
+    function applyDynamicColumnWidths() {
+      renderResultColumns();
+    }
+
+    async function ensureCurrentResultTextForColumns() {
+      if (!dynamicColumns.some(columnNeedsContent) || !currentResults.length) return;
+
+      const pendingResults = currentResults.filter(result =>
+        isPdfName(result.name) && !result.content && !result.textExtractionAttempted
+      );
+      if (!pendingResults.length) return;
+
+      let extracted = 0;
+      let failed = 0;
+      const pageNumber = getExtractPageNumber();
+      for (const result of pendingResults) {
+        result.textExtractionAttempted = true;
+        try {
+          setStatus(`Extracting text from ${formatExtractTarget(result.name)}...`);
+          result.content = await extractPdfText(result.file || await result.handle.getFile(), pageNumber);
+          extracted += 1;
+        } catch (error) {
+          console.warn("Could not extract PDF text:", result.name, error);
+          failed += 1;
+        }
+      }
+
+      const failedNote = failed ? `, ${failed} failed` : "";
+      setStatus(`Updated regex columns for ${extracted} existing file${extracted === 1 ? "" : "s"}${failedNote}.`, failed ? "warn" : "ok");
+    }
+
+    function renderColumnTags() {
+      columnTags.innerHTML = "";
+      columnCount.textContent = dynamicColumns.length ? `(${dynamicColumns.length})` : "";
+
+      if (!dynamicColumns.length) {
+        const empty = document.createElement("span");
+        empty.textContent = "No regex columns yet.";
+        columnTags.append(empty);
+        return;
+      }
+
+      dynamicColumns.forEach((column, index) => {
+        Object.assign(column, normalizeColumn(column));
+        const tag = document.createElement("div");
+        const handle = document.createElement("button");
+        const removeButton = document.createElement("button");
+        tag.className = "column-tag";
+        tag.dataset.columnIndex = String(index);
+
+        handle.className = "column-tag-handle";
+        handle.type = "button";
+        handle.draggable = true;
+        handle.textContent = ":::";
+        handle.setAttribute("aria-label", `Move ${getColumnLabel(column, index)}`);
+
+        handle.addEventListener("click", event => {
+          event.stopPropagation();
+        });
+
+        handle.addEventListener("dragstart", event => {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", String(index));
+          tag.classList.add("is-dragging");
+        });
+
+        handle.addEventListener("dragend", () => {
+          tag.classList.remove("is-dragging");
+          columnTags.querySelectorAll(".is-drag-over").forEach(item => item.classList.remove("is-drag-over"));
+        });
+
+        tag.addEventListener("dragover", event => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+          tag.classList.add("is-drag-over");
+        });
+
+        tag.addEventListener("dragleave", () => {
+          tag.classList.remove("is-drag-over");
+        });
+
+        tag.addEventListener("drop", event => {
+          event.preventDefault();
+          tag.classList.remove("is-drag-over");
+          const fromIndex = Number(event.dataTransfer.getData("text/plain"));
+          if (!Number.isInteger(fromIndex) || fromIndex === index) return;
+          const [movedColumn] = dynamicColumns.splice(fromIndex, 1);
+          dynamicColumns.splice(index, 0, movedColumn);
+          if (activeColumnIndex === fromIndex) {
+            activeColumnIndex = index;
+          } else if (activeColumnIndex !== null) {
+            if (fromIndex < activeColumnIndex && index >= activeColumnIndex) activeColumnIndex -= 1;
+            if (fromIndex > activeColumnIndex && index <= activeColumnIndex) activeColumnIndex += 1;
+          }
+          saveColumns();
+          renderHeaders();
+          renderColumnTags();
+          renderRows();
+        });
+
+        removeButton.className = "column-tag-remove";
+        removeButton.type = "button";
+        removeButton.textContent = "x";
+        removeButton.setAttribute("aria-label", `Remove ${getColumnLabel(column, index)}`);
+
+        removeButton.addEventListener("mousedown", event => {
+          event.preventDefault();
+        });
+
+        removeButton.addEventListener("click", event => {
+          event.stopPropagation();
+          dynamicColumns.splice(index, 1);
+          if (activeColumnIndex === index) activeColumnIndex = null;
+          if (activeColumnIndex !== null && activeColumnIndex > index) activeColumnIndex -= 1;
+          saveColumns();
+          renderHeaders();
+          renderColumnTags();
+          renderRows();
+        });
+
+        if (activeColumnIndex === index) {
+          const editor = document.createElement("div");
+          const nameInput = document.createElement("input");
+          const patternInput = document.createElement("textarea");
+          const sourceSelect = document.createElement("select");
+
+          editor.className = "column-tag-editor";
+          nameInput.className = "column-tag-name";
+          nameInput.type = "text";
+          nameInput.value = column.name;
+          nameInput.placeholder = "Display name";
+          nameInput.spellcheck = false;
+          patternInput.className = "column-tag-pattern";
+          patternInput.value = column.pattern;
+          patternInput.placeholder = "TOTAL\\s*CELLAR\\s*(\\S+)";
+          patternInput.spellcheck = false;
+          patternInput.rows = 2;
+
+          for (const [value, label] of [
+            ["content", "Content"],
+            ["file", "File"],
+            ["folder", "Folder"],
+            ["path", "Path"],
+            ["size", "Size"],
+          ]) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = label;
+            sourceSelect.append(option);
+          }
+          sourceSelect.value = normalizeColumn(column).source;
+
+          async function updateColumn() {
+            column.name = nameInput.value;
+            column.pattern = patternInput.value;
+            column.source = sourceSelect.value;
+            saveColumns();
+            renderHeaders();
+            await ensureCurrentResultTextForColumns();
+            renderRows();
+          }
+
+          nameInput.addEventListener("input", updateColumn);
+          patternInput.addEventListener("input", updateColumn);
+          sourceSelect.addEventListener("change", updateColumn);
+
+          tag.addEventListener("focusout", event => {
+            if (event.relatedTarget && tag.contains(event.relatedTarget)) return;
+            activeColumnIndex = null;
+            renderColumnTags();
+          });
+
+          tag.addEventListener("keydown", event => {
+            if (event.key === "Enter" || event.key === "Escape") {
+              event.preventDefault();
+              activeColumnIndex = null;
+              renderColumnTags();
+            }
+          });
+
+          editor.append(sourceSelect, nameInput, patternInput);
+          tag.append(handle, editor, removeButton);
+          columnTags.append(tag);
+          requestAnimationFrame(() => {
+            nameInput.focus();
+            nameInput.select();
+          });
+          return;
+        }
+
+        const label = document.createElement("span");
+        const title = document.createElement("span");
+        const meta = document.createElement("span");
+        const normalizedColumn = normalizeColumn(column);
+        label.className = "column-tag-label";
+        title.className = "column-tag-title";
+        meta.className = "column-tag-meta";
+        title.textContent = getColumnLabel(column, index);
+        meta.textContent = `${getColumnSourceLabel(normalizedColumn.source)} · ${normalizedColumn.pattern || "No regex"}`;
+        label.title = normalizedColumn.pattern;
+        label.tabIndex = 0;
+        label.append(title, meta);
+        label.addEventListener("click", () => {
+          activeColumnIndex = index;
+          renderColumnTags();
+        });
+        label.addEventListener("keydown", event => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            activeColumnIndex = index;
+            renderColumnTags();
+          }
+        });
+
+        tag.append(handle, label, removeButton);
+        columnTags.append(tag);
+      });
+    }
+
+    function addDynamicHeader(column, index) {
+      const columnIndex = index + 4;
+      const th = document.createElement("th");
+      const label = document.createElement("span");
+      th.className = "dynamic selectable-column";
+      th.dataset.columnIndex = String(columnIndex);
+      th.title = column.pattern;
+      label.className = "dynamic-header-label";
+      label.textContent = getColumnLabel(column, index);
+      th.append(label);
+
+      th.addEventListener("click", event => {
+        selectColumn(columnIndex, event);
+      });
+      headerRow.insertBefore(th, headerRow.querySelector("th.action"));
+    }
+
+    function renderHeaders() {
+      headerRow.querySelectorAll("th.dynamic").forEach(th => th.remove());
+      headerRow.querySelectorAll("th.selectable-column").forEach(th => th.remove());
+      headerRow.insertBefore(makeColumnHeader("name", 0, "File"), headerRow.firstChild);
+      headerRow.insertBefore(makeColumnHeader("path", 1, "Folder"), headerRow.children[1]);
+      headerRow.insertBefore(makeColumnHeader("size", 2, "Size"), headerRow.children[2]);
+      headerRow.insertBefore(makeColumnHeader("content", 3, "Content"), headerRow.children[3]);
+      dynamicColumns.forEach(addDynamicHeader);
+      renderResultColumns();
+      updateSelectionUi();
+    }
+
+    function renderRows() {
+      resultsBody.innerHTML = "";
+      selectedCells = new Set();
+      selectionAnchor = null;
+
+      if (!currentResults.length) {
+        clearResults("No results yet.");
+        return;
+      }
+
+      currentResults.forEach((result, rowIndex) => addResultRow(result, rowIndex));
+      updateSelectionUi();
+    }
+
+    function addResultRow(result, rowIndex) {
+      const row = document.createElement("tr");
+      const actionCell = document.createElement("td");
+      const downloadButton = document.createElement("button");
+
+      actionCell.className = "action";
       downloadButton.textContent = "Download";
       downloadButton.type = "button";
+      downloadButton.disabled = result.kind === "folder";
       downloadButton.addEventListener("click", () => downloadResult(result));
 
-      contentCell.append(contentButton);
+      row.append(
+        makeCell(rowIndex, 0, "name", getDisplayCellValue(result, 0)),
+        makeCell(rowIndex, 1, "path", getDisplayCellValue(result, 1)),
+        makeCell(rowIndex, 2, "size", getDisplayCellValue(result, 2)),
+        makeCell(rowIndex, 3, "content", getDisplayCellValue(result, 3)),
+      );
+
+      dynamicColumns.forEach((column, index) => {
+        const columnIndex = index + 4;
+        row.append(makeCell(rowIndex, columnIndex, "dynamic", getDisplayCellValue(result, columnIndex)));
+      });
+
       actionCell.append(downloadButton);
-      row.append(nameCell, pathCell, sizeCell, contentCell, actionCell);
+      row.append(actionCell);
       resultsBody.append(row);
+      applyDynamicColumnWidths();
+    }
+
+    function addResult(result) {
       currentResults.push(result);
-      copyResultsButton.hidden = false;
-      downloadAllButton.hidden = false;
+      addResultRow(result, currentResults.length - 1);
+      downloadAllButton.hidden = !currentResults.some(item => item.kind !== "folder");
     }
 
     function escapeTsvValue(value) {
       return String(value).replace(/\t/g, " ").replace(/\r?\n/g, " ");
-    }
-
-    function buildResultsTsv() {
-      const rows = [
-        ["File name", "Folder", "Size", "Content"],
-        ...currentResults.map(result => [
-          result.name,
-          result.folderPath || rootName,
-          formatBytes(result.file.size),
-          result.content || "",
-        ]),
-      ];
-      return rows.map(row => row.map(escapeTsvValue).join("\t")).join("\n");
     }
 
     async function writeClipboardText(text) {
@@ -734,6 +1766,110 @@
       }
     }
 
+    function cellKey(rowIndex, columnIndex) {
+      return `${rowIndex}:${columnIndex}`;
+    }
+
+    function parseCellKey(key) {
+      const [rowIndex, columnIndex] = key.split(":").map(Number);
+      return { rowIndex, columnIndex };
+    }
+
+    function setSelectionRange(start, end, append = false) {
+      const nextSelection = append ? new Set(selectedCells) : new Set();
+      const rowStart = Math.min(start.rowIndex, end.rowIndex);
+      const rowEnd = Math.max(start.rowIndex, end.rowIndex);
+      const columnStart = Math.min(start.columnIndex, end.columnIndex);
+      const columnEnd = Math.max(start.columnIndex, end.columnIndex);
+
+      for (let rowIndex = rowStart; rowIndex <= rowEnd; rowIndex += 1) {
+        for (let columnIndex = columnStart; columnIndex <= columnEnd; columnIndex += 1) {
+          nextSelection.add(cellKey(rowIndex, columnIndex));
+        }
+      }
+
+      selectedCells = nextSelection;
+      updateSelectionUi();
+    }
+
+    function selectCell(rowIndex, columnIndex, event) {
+      const point = { rowIndex, columnIndex };
+
+      if (event.shiftKey && selectionAnchor) {
+        setSelectionRange(selectionAnchor, point, event.ctrlKey || event.metaKey);
+        return;
+      }
+
+      if (event.ctrlKey || event.metaKey) {
+        const key = cellKey(rowIndex, columnIndex);
+        const nextSelection = new Set(selectedCells);
+        if (nextSelection.has(key)) {
+          nextSelection.delete(key);
+        } else {
+          nextSelection.add(key);
+        }
+        selectedCells = nextSelection;
+        selectionAnchor = point;
+        updateSelectionUi();
+        return;
+      }
+
+      selectedCells = new Set([cellKey(rowIndex, columnIndex)]);
+      selectionAnchor = point;
+      updateSelectionUi();
+    }
+
+    function selectColumn(columnIndex, event) {
+      if (!currentResults.length) return;
+      const start = { rowIndex: 0, columnIndex };
+      const end = { rowIndex: currentResults.length - 1, columnIndex };
+
+      if (event.shiftKey && selectionAnchor) {
+        setSelectionRange(selectionAnchor, end, event.ctrlKey || event.metaKey);
+        return;
+      }
+
+      if (event.ctrlKey || event.metaKey) {
+        setSelectionRange(start, end, true);
+        selectionAnchor = start;
+        return;
+      }
+
+      selectionAnchor = start;
+      setSelectionRange(start, end);
+    }
+
+    function updateSelectionUi() {
+      resultsBody.querySelectorAll("td.selectable-cell").forEach(cell => {
+        const key = cellKey(Number(cell.dataset.rowIndex), Number(cell.dataset.columnIndex));
+        cell.classList.toggle("is-selected", selectedCells.has(key));
+      });
+
+      headerRow.querySelectorAll("th.selectable-column").forEach(th => {
+        const columnIndex = Number(th.dataset.columnIndex);
+        const isSelected = currentResults.length > 0
+          && currentResults.every((_, rowIndex) => selectedCells.has(cellKey(rowIndex, columnIndex)));
+        th.classList.toggle("is-selected", isSelected);
+      });
+    }
+
+    function buildSelectedTsv() {
+      if (!selectedCells.size) return "";
+      const points = [...selectedCells].map(parseCellKey);
+      const rowIndexes = [...new Set(points.map(point => point.rowIndex))].sort((a, b) => a - b);
+      const columnIndexes = [...new Set(points.map(point => point.columnIndex))].sort((a, b) => a - b);
+      const rows = [];
+
+      for (const rowIndex of rowIndexes) {
+        const row = columnIndexes
+          .filter(columnIndex => selectedCells.has(cellKey(rowIndex, columnIndex)))
+          .map(columnIndex => getClipboardCellValue(currentResults[rowIndex], columnIndex));
+        rows.push(row);
+      }
+
+      return rows.map(row => row.map(escapeTsvValue).join("\t")).join("\n");
+    }
+
     async function downloadResult(result) {
       try {
         const file = await result.handle.getFile();
@@ -754,8 +1890,9 @@
 
     downloadAllButton.addEventListener("click", async () => {
       downloadAllButton.disabled = true;
-      setStatus(`Downloading ${currentResults.length} file${currentResults.length === 1 ? "" : "s"}…`);
-      for (const result of currentResults) {
+      const downloadableResults = currentResults.filter(result => result.kind !== "folder");
+      setStatus(`Downloading ${downloadableResults.length} file${downloadableResults.length === 1 ? "" : "s"}…`);
+      for (const result of downloadableResults) {
         try {
           const file = await result.handle.getFile();
           const url = URL.createObjectURL(file);
@@ -772,19 +1909,84 @@
         }
       }
       downloadAllButton.disabled = false;
-      setStatus(`Started download of ${currentResults.length} file${currentResults.length === 1 ? "" : "s"}.`, "ok");
+      setStatus(`Started download of ${downloadableResults.length} file${downloadableResults.length === 1 ? "" : "s"}.`, "ok");
     });
 
-    copyResultsButton.addEventListener("click", async () => {
-      copyResultsButton.disabled = true;
+    async function previewFirstResultText() {
+      const result = currentResults.find(item => item.kind !== "folder");
+      if (!result) {
+        setStatus("Run a file search before previewing column text.", "error");
+        return;
+      }
+
+      const extractPageNumber = getExtractPageNumber();
+      if (Number.isNaN(extractPageNumber)) {
+        setStatus("Enter a whole PDF page number of 1 or higher, or leave Extract blank.", "error");
+        return;
+      }
+
+      previewColumnSourceButton.disabled = true;
+      setColumnPreview("Extracting preview text...");
       try {
-        await writeClipboardText(buildResultsTsv());
-        setStatus(`Copied ${currentResults.length} file${currentResults.length === 1 ? "" : "s"} as TSV.`, "ok");
+        if (!result.content) {
+          const file = result.file || await result.handle.getFile();
+          if (isPdfName(result.name)) {
+            result.content = await extractPdfText(file, extractPageNumber);
+          } else {
+            result.content = await file.text();
+          }
+          result.file = file;
+          result.textExtractionAttempted = true;
+          renderRows();
+        }
+
+        setColumnPreview(result.content || "(No extractable text found.)");
+        setStatus(`Previewing extracted text from ${result.name}.`, result.content ? "ok" : "warn");
       } catch (error) {
-        console.error("Could not copy results:", error);
-        setStatus(`Could not copy results: ${error.message}`, "error");
+        console.error("Could not preview text:", error);
+        setColumnPreview("");
+        setStatus(`Could not preview text from ${result.name}: ${error.message}`, "error");
       } finally {
-        copyResultsButton.disabled = false;
+        previewColumnSourceButton.disabled = false;
+      }
+    }
+
+    previewColumnSourceButton.addEventListener("click", previewFirstResultText);
+
+    addColumnButton.addEventListener("click", async () => {
+      dynamicColumns.push({ pattern: "", name: "", source: "content" });
+      activeColumnIndex = dynamicColumns.length - 1;
+      saveColumns();
+      renderHeaders();
+      renderColumnTags();
+      await ensureCurrentResultTextForColumns();
+      renderRows();
+    });
+
+    document.addEventListener("copy", event => {
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (activeTag === "input" || activeTag === "textarea" || !selectedCells.size) return;
+
+      const text = buildSelectedTsv();
+      if (!text) return;
+
+      event.preventDefault();
+      event.clipboardData.setData("text/plain", text);
+      setStatus(`Copied ${selectedCells.size} selected cell${selectedCells.size === 1 ? "" : "s"} as TSV.`, "ok");
+    });
+
+    document.addEventListener("keydown", async event => {
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (activeTag === "input" || activeTag === "textarea") return;
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "c" || !selectedCells.size) return;
+
+      event.preventDefault();
+      try {
+        await writeClipboardText(buildSelectedTsv());
+        setStatus(`Copied ${selectedCells.size} selected cell${selectedCells.size === 1 ? "" : "s"} as TSV.`, "ok");
+      } catch (error) {
+        console.error("Could not copy selection:", error);
+        setStatus(`Could not copy selection: ${error.message}`, "error");
       }
     });
 
@@ -828,9 +2030,24 @@
         return;
       }
 
+      const searchMode = searchModeSelect.value;
+      const extractPageNumber = getExtractPageNumber();
+      if (Number.isNaN(extractPageNumber)) {
+        setStatus("Enter a whole PDF page number of 1 or higher, or leave Extract blank.", "error");
+        return;
+      }
+
+      const recurseDepth = getRecurseDepth();
+      if (Number.isNaN(recurseDepth)) {
+        setStatus("Enter a whole recurse depth of 1 or higher, or leave Recurse depth blank.", "error");
+        return;
+      }
+
       resultsBody.innerHTML = "";
       currentResults = [];
-      copyResultsButton.hidden = true;
+      selectedCells = new Set();
+      selectionAnchor = null;
+      setColumnPreview("");
       downloadAllButton.hidden = true;
       resetInaccessible();
       folderListHint.textContent = "";
@@ -843,6 +2060,32 @@
       let skipped = 0;
       let extractionFailed = 0;
       let aborted = false;
+
+      async function addMatchedFile(entry) {
+        try {
+          const file = await entry.handle.getFile();
+          let content = "";
+          let textExtractionAttempted = false;
+          const needsText = extractTextInput.checked || dynamicColumns.some(columnNeedsContent);
+          if (needsText && isPdfName(entry.name)) {
+            textExtractionAttempted = true;
+            try {
+              setStatus(`Extracting text from ${formatExtractTarget(entry.name)}...`);
+              content = await extractPdfText(file, extractPageNumber);
+            } catch (error) {
+              console.warn("Could not extract PDF text:", entry.name, error);
+              extractionFailed += 1;
+            }
+          }
+          matched += 1;
+          addResult({ ...entry, file, content, textExtractionAttempted });
+        } catch (error) {
+          const path = `${entry.folderPath ? entry.folderPath + "/" : ""}${entry.name}`;
+          console.warn("Could not access file:", path, error);
+          addInaccessible(path, "file");
+          skipped += 1;
+        }
+      }
 
       // build list of target {handle, folderPath} to walk
       const lines = parseDirListLines();
@@ -883,7 +2126,34 @@
             break;
           }
 
-          for await (const entry of walkDirectory(target.handle, target.folderPath, recursiveInput.checked)) {
+          if (searchMode === "folder") {
+            for await (const folder of walkFolders(target.handle, target.folderPath, recursiveInput.checked, recurseDepth)) {
+              if (abortRequested) {
+                aborted = true;
+                break;
+              }
+
+              if (folder.kind === "error") {
+                console.warn("Could not access folder:", folder.path, folder.error);
+                addInaccessible(folder.path, "folder");
+                skipped += 1;
+                continue;
+              }
+
+              checked += 1;
+              regex.lastIndex = 0;
+              if (!regex.test(getFolderName(folder.folderPath))) continue;
+              matched += 1;
+              addResult({ kind: "folder", handle: folder.handle, folderPath: folder.folderPath });
+
+              if (matched % 10 === 0) {
+                setStatus(`Searching… ${checked} folders checked, ${matched} folder matches.`);
+              }
+            }
+            continue;
+          }
+
+          for await (const entry of walkDirectory(target.handle, target.folderPath, recursiveInput.checked, recurseDepth)) {
             if (abortRequested) {
               aborted = true;
               break;
@@ -897,28 +2167,10 @@
             }
 
             checked += 1;
-            if (!regex.test(entry.name)) continue;
-
-            try {
-              const file = await entry.handle.getFile();
-              let content = "";
-              if (extractTextInput.checked && isPdfName(entry.name)) {
-                try {
-                  setStatus(`Extracting text from ${entry.name}...`);
-                  content = await extractPdfText(file);
-                } catch (error) {
-                  console.warn("Could not extract PDF text:", entry.name, error);
-                  extractionFailed += 1;
-                }
-              }
-              matched += 1;
-              addResult({ ...entry, file, content });
-            } catch (error) {
-              const path = `${entry.folderPath ? entry.folderPath + "/" : ""}${entry.name}`;
-              console.warn("Could not access file:", path, error);
-              addInaccessible(path, "file");
-              skipped += 1;
-            }
+            regex.lastIndex = 0;
+            const searchValue = getSearchValue(entry, searchMode);
+            if (!regex.test(searchValue)) continue;
+            await addMatchedFile(entry);
 
             if (abortRequested) {
               aborted = true;
@@ -937,11 +2189,13 @@
 
         const skipNote = skipped ? `, ${skipped} inaccessible` : "";
         const extractionNote = extractionFailed ? `, ${extractionFailed} text extraction failed` : "";
+        const checkedLabel = searchMode === "folder" ? "folders" : "files";
+        const matchLabel = searchMode === "folder" ? "folder matches" : "files added";
         if (aborted) {
           if (matched === 0) clearResults("Search aborted before any matches were added.");
-          setStatus(`Search aborted. ${checked} files checked, ${matched} matches${skipNote}${extractionNote}.`, "warn");
+          setStatus(`Search aborted. ${checked} ${checkedLabel} checked, ${matched} ${matchLabel}${skipNote}${extractionNote}.`, "warn");
         } else {
-          setStatus(`Search complete. ${checked} files checked, ${matched} matches${skipNote}${extractionNote}.`, matched && !extractionFailed ? "ok" : skipped || extractionFailed ? "warn" : "");
+          setStatus(`Search complete. ${checked} ${checkedLabel} checked, ${matched} ${matchLabel}${skipNote}${extractionNote}.`, matched && !extractionFailed ? "ok" : skipped || extractionFailed ? "warn" : "");
         }
       } catch (error) {
         console.error("Search failed:", error);
